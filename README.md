@@ -1,1 +1,1 @@
-# working on it inshallah it will be released soon
+# working on it insha allah it will be released soon
