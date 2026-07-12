@@ -1,0 +1,5 @@
+demucs-onnx[mp3]
+moviepy
+requests
+tqdm
+yt-dlp
