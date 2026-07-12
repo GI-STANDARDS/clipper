@@ -153,3 +153,7 @@ python main.py video.mp4 --csv data/time.csv -o output --separate-vocals
 - YouTube segment downloading uses ffmpeg sub-processes for fast extraction
 - The tool caches downloaded YouTube source files in `output/_temp/` to avoid re-downloading
 - Whisper model files are downloaded on first use and cached locally
+- This tool is limited to it potention now its on 25% to 50% because i dosent have a good pc to make it run on it full potentional
+`By potentional run i mean the vocal spreator to make video with only vocal`
+`it remove all bgm at this potentional but some human voice created bgm arent being excluded`
+`it also sometimes remove the clap, slap, foot sound, veichle sound etc`
