@@ -36,7 +36,7 @@ def main():
     parser.add_argument("--format", default=None, help="yt-dlp format ID for YouTube download")
     parser.add_argument("--no-audio", action="store_true", help="Format is video-only, pair with bestaudio")
     parser.add_argument("--height", type=int, default=0, help="Video height for format sorting")
-    parser.add_argument("--csv", default="time.csv", help="Path to time.csv (default: time.csv)")
+    parser.add_argument("--csv", default="data/time.csv", help="Path to time.csv (default: data/time.csv)")
     parser.add_argument("-o", "--output", default="output", help="Output directory")
     parser.add_argument("--subfolder", default="default", help="Subfolder name inside output")
     parser.add_argument("--separate-vocals", action="store_true", help="Separate vocals after each clip")
