@@ -76,6 +76,11 @@ def menu():
     print(f"  --- YouTube ---")
     print(f"  [8]  YouTube Direct")
     print()
+    print(f"  --- Tools ---")
+    print(f"  [10] YouTube Extract (transcript + comments)")
+    print(f"  [11] Audio Captioner (local video -> captioned video)")
+    print(f"  [12] Silence Remover (remove silence from audio)")
+    print()
     print(f"  --- Setup ---")
     print(f"  [9]  Check / Install Requirements")
     print()
@@ -437,6 +442,160 @@ def youtube_direct():
     input("  Press Enter to continue...")
 
 
+def youtube_extract():
+    clear_screen()
+    print("-- YouTube Extract ----------------------------------")
+    print()
+    print("  Extract transcript, comments, and comment count")
+    print("  from a YouTube video.")
+    print()
+
+    url = input("  Paste YouTube URL: ").strip()
+    if not url:
+        print("  (cancelled)")
+        input("  Press Enter to continue...")
+        return
+    if not is_youtube_url(url):
+        print("  [ERROR] Not a valid YouTube URL.")
+        input("  Press Enter to continue...")
+        return
+
+    from extractor import (
+        check_extracted,
+        extract_transcript,
+        extract_comments,
+        extract_comment_count,
+        get_video_title,
+        append_extracted,
+    )
+
+    print("  Fetching video info...")
+    title = get_video_title(url)
+    if not title:
+        print("  [ERROR] Could not fetch video info.")
+        input("  Press Enter to continue...")
+        return
+
+    from downloader import sanitize_filename
+    safe_title = sanitize_filename(title)
+    output_dir = str(BASE / "output")
+
+    if check_extracted(output_dir, safe_title):
+        print(f'  Warning: "{title}" already extracted.')
+        ans = input("  Extract again? (y/N): ").strip().lower()
+        if ans != "y":
+            print("  Skipped.")
+            input("  Press Enter to continue...")
+            return
+
+    print(f"  Title: {title}")
+    print()
+
+    print("  Extracting transcript...")
+    try:
+        extract_transcript(url, output_dir)
+    except Exception as e:
+        print(f"  [TRANSCRIPT] Failed: {e}")
+
+    print()
+    ans = input("  Extract comments? (y/N): ").strip().lower()
+    if ans == "y":
+        max_input = input("  Max comments (Enter=all): ").strip()
+        max_comments = int(max_input) if max_input.isdigit() else None
+        print("  Extracting comments (this may take a while)...")
+        try:
+            extract_comments(url, output_dir, max_comments=max_comments)
+        except Exception as e:
+            print(f"  [COMMENTS] Failed: {e}")
+
+    print()
+    print("  Getting comment count...")
+    try:
+        extract_comment_count(url, output_dir)
+    except Exception as e:
+        print(f"  [COUNT] Failed: {e}")
+
+    append_extracted(output_dir, safe_title)
+
+    print()
+    print("  Done! Files saved to:")
+    print(f"    output/{safe_title}/")
+    input("  Press Enter to continue...")
+
+
+def audio_captioner():
+    clear_screen()
+    print("-- Audio Captioner ----------------------------------")
+    print()
+    print("  Create a captioned video from a local video file.")
+    print("  Uses Whisper to transcribe, translates to English,")
+    print("  and renders captions on a white background.")
+    print()
+    print("  Opening file browser...")
+    path = pick_file()
+    if not path:
+        print("  (cancelled)")
+        input("  Press Enter to continue...")
+        return
+
+    print(f"  Video: {path}")
+    print()
+    print("  Select Whisper model size:")
+    print("  [1] tiny  (fastest, least accurate)")
+    print("  [2] base  (default)")
+    print("  [3] small (balanced)")
+    print("  [4] medium (slower, more accurate)")
+    print("  [5] large  (slowest, most accurate)")
+    print()
+    model_choice = input("  Select (Enter=base): ").strip()
+    model_map = {"1": "tiny", "2": "base", "3": "small", "4": "medium", "5": "large"}
+    model_size = model_map.get(model_choice, "base")
+
+    print()
+    print(f"  Model: {model_size}")
+    print(f"  Output: output/video-title_[lang].mp4")
+    print()
+
+    from captioner import caption_video
+    from downloader import sanitize_filename
+    output_dir = str(BASE / "output")
+
+    result = caption_video(path, output_dir, model_size=model_size)
+    if result:
+        print(f"\n  Done! Saved to: {Path(result).name}")
+    else:
+        print("\n  [ERROR] Captioning failed.")
+    input("  Press Enter to continue...")
+
+
+def silence_remover_tool():
+    clear_screen()
+    print("-- Silence Remover ----------------------------------")
+    print()
+    print("  Remove silent regions from an audio file.")
+    print("  Opens a file browser to select the audio file,")
+    print("  then exports a silence-free version.")
+    print()
+    print("  Running silence_remover.py...")
+    print()
+
+    script = BASE / "silence_remover.py"
+    if not script.exists():
+        print(f"  [ERROR] {script} not found.")
+        input("  Press Enter to continue...")
+        return
+
+    venv_python = BASE / "venv" / "Scripts" / "python.exe"
+    cmd = [str(venv_python), "-u", str(script)]
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    result = subprocess.run(cmd, timeout=600, env=env)
+    print()
+    if result.returncode != 0:
+        print(f"  [!!] Silence Remover exited with code {result.returncode}.")
+    input("  Press Enter to continue...")
+
+
 def check_requirements():
     clear_screen()
     print("-- Check / Install Requirements --------------------")
@@ -514,6 +673,12 @@ def main():
             process_one()
         elif choice == "8":
             youtube_direct()
+        elif choice == "10":
+            youtube_extract()
+        elif choice == "11":
+            audio_captioner()
+        elif choice == "12":
+            silence_remover_tool()
         elif choice == "9":
             check_requirements()
         elif choice == "7":
@@ -522,7 +687,7 @@ def main():
             pass
         else:
             clear_screen()
-            print("  Invalid option. Enter a number 1-9.")
+            print("  Invalid option. Enter a number 1-12.")
             input("  Press Enter to continue...")
 
 

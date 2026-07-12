@@ -3,3 +3,7 @@ moviepy
 requests
 tqdm
 yt-dlp
+youtube-transcript-api
+openai-whisper
+deep-translator
+pydub
