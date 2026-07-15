@@ -13,6 +13,8 @@ A command-line tool for clipping videos into segments using timestamps from a CS
 - **YouTube Direct** — paste a YouTube URL, pick a format, and download only the segments you need
 - **3-layer fallback download** — segment-aware sidx parsing → range estimation → full download + clip
 - **Format selection** — choose from available formats with size estimates for both full video and clips
+- **Playlist download** — download entire YouTube playlists at a chosen resolution with size estimates
+- **Custom playlist download** — start downloading from a specific episode number or video link in a playlist
 
 ### YouTube Extraction
 - **Transcript extraction** — pull subtitles/transcripts from any YouTube video
@@ -81,6 +83,7 @@ python frontend.py
 | `6` | Process One | Process a single video from the queue |
 | `7` | Exit | Exit the application |
 | `8` | YouTube Direct | Download and clip from a YouTube URL |
+| `13` | Playlist Download | Download all videos from a YouTube playlist |
 | `9` | Check / Install Requirements | Verify and install missing packages |
 | `10` | YouTube Extract | Extract transcript, comments, and comment count |
 | `11` | Audio Captioner | Transcribe and caption a local video |
@@ -95,7 +98,7 @@ Create `data/time.csv` with one timestamp pair per line:
 08:34 – 08:46
 ```
 
-Format: `MM:SS – MM:SS` or `HH:MM:SS – HH:MM:SS`. Line numbers and en-dashes are supported.
+Format: `MM:SS - MM:SS` or `HH:MM:SS - HH:MM:SS`. Line numbers, en-dashes (`–`), em-dashes (`—`), and hyphens (`-`) are all supported as separators.
 
 ### YouTube Direct workflow
 1. Select `[8] YouTube Direct`
@@ -103,6 +106,22 @@ Format: `MM:SS – MM:SS` or `HH:MM:SS – HH:MM:SS`. Line numbers and en-dashes
 3. View available formats with size estimates (full video vs clips only)
 4. Pick a format ID or press Enter for best quality
 5. Segments are downloaded and clipped to `output/`
+
+### Playlist Download workflow
+1. Select `[13] Playlist Download`
+2. Paste the YouTube playlist URL
+3. Select a download folder via the folder picker
+4. View available resolutions with total/average size estimates
+5. Pick a resolution (required, no auto-select)
+6. Videos download sequentially with live progress
+
+### Custom Playlist Download
+Run `PlaylistCustom.bat` (standalone, outside the main menu):
+1. Paste the YouTube playlist URL
+2. Enter a starting episode number (e.g., `1812`)
+3. The script extracts episode numbers from video titles and filters from that episode onward
+4. If title matching fails, you can paste the exact video link instead — it finds the position and downloads from there
+5. Select folder and resolution, then download
 
 ### Vocal Separation
 When processing videos (options 5, 6, or 8), you'll be asked if you want to separate vocals. If enabled:
@@ -115,19 +134,20 @@ When processing videos (options 5, 6, or 8), you'll be asked if you want to sepa
 ```
 timestamp clips/
 ├── App.bat                 # Launcher
+├── PlaylistCustom.bat      # Custom playlist download launcher
 ├── frontend.py             # Main TUI menu
 ├── main.py                 # CLI entry point for clipping
 ├── clipper.py              # Video clipping + CSV parser
 ├── downloader.py           # YouTube download (3-layer fallback)
 ├── vocal_remover.py        # Demucs-onnx vocal separation
-├── extractor.py            # YouTube transcript/comments extraction
+├── yt_extractor.py         # YouTube transcript/comments extraction
 ├── captioner.py            # Whisper transcription + translation + captions
 ├── silence_remover.py      # Audio silence removal
+├── playlist_custom.py      # Custom episode-range playlist download
 ├── config.py               # Default configuration
 ├── requirements.txt        # Python dependencies
 ├── data/
 │   ├── time.csv            # Timestamps for clipping
-│   ├── urls.txt            # YouTube URLs
 │   └── queue.txt           # Video processing queue
 └── output/                 # Generated clips and files
     ├── extracted.txt       # Log of extracted YouTube videos
@@ -153,7 +173,3 @@ python main.py video.mp4 --csv data/time.csv -o output --separate-vocals
 - YouTube segment downloading uses ffmpeg sub-processes for fast extraction
 - The tool caches downloaded YouTube source files in `output/_temp/` to avoid re-downloading
 - Whisper model files are downloaded on first use and cached locally
-- This tool is limited to it potention now its on 25% to 50% because i dosent have a good pc to make it run on it full potentional
-`By potentional run i mean the vocal spreator to make video with only vocal`
-`it remove all bgm at this potentional but some human voice created bgm arent being excluded`
-`it also sometimes remove the clap, slap, foot sound, veichle sound etc`
