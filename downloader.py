@@ -736,6 +736,193 @@ def _download_full_then_clip(
     return clips, title
 
 
+def fetch_playlist_info(url: str) -> dict:
+    opts_flat = {
+        **_YTDL_COMMON,
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+        "playlist_items": "0:100",
+        "skip_download": True,
+    }
+
+    with yt_dlp.YoutubeDL(opts_flat) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    playlist_title = info.get("playlist_title") or info.get("title") or "playlist"
+    entries = list(info.get("entries", []))
+
+    videos = []
+    for entry in entries:
+        if not entry:
+            continue
+        videos.append({
+            "title": entry.get("title") or entry.get("id") or "unknown",
+            "id": entry.get("id") or "",
+            "duration": entry.get("duration") or 0,
+        })
+
+    if not videos:
+        return {"title": playlist_title, "videos": [], "resolutions": []}
+
+    sample_count = min(5, len(videos))
+    opts_full = {
+        **_YTDL_COMMON,
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+    }
+
+    seen_resolutions = {}
+
+    for vid in videos[:sample_count]:
+        vid_url = f"https://www.youtube.com/watch?v={vid['id']}"
+        try:
+            with yt_dlp.YoutubeDL(opts_full) as ydl:
+                vinfo = ydl.extract_info(vid_url, download=False)
+        except Exception:
+            continue
+
+        formats = vinfo.get("formats") or []
+        best_for_height = {}
+
+        for f in formats:
+            height = f.get("height")
+            if not isinstance(height, int) or height == 0:
+                continue
+            if f.get("vcodec") == "none":
+                continue
+
+            has_audio = f.get("acodec") not in ("none", None, "") and (f.get("abr") or 0) > 0
+            filesize = f.get("filesize") or f.get("filesize_approx") or 0
+            if not isinstance(filesize, int):
+                filesize = 0
+            fmt_id = f.get("format_id") or ""
+
+            key = f"{height}p"
+            if key not in best_for_height:
+                best_for_height[key] = {
+                    "height": height,
+                    "format_id": fmt_id,
+                    "filesize": filesize,
+                    "has_audio": has_audio,
+                }
+            else:
+                cur = best_for_height[key]
+                if has_audio and not cur["has_audio"]:
+                    best_for_height[key] = {
+                        "height": height,
+                        "format_id": fmt_id,
+                        "filesize": filesize,
+                        "has_audio": has_audio,
+                    }
+                elif has_audio == cur["has_audio"] and filesize > cur["filesize"]:
+                    best_for_height[key] = {
+                        "height": height,
+                        "format_id": fmt_id,
+                        "filesize": filesize,
+                        "has_audio": has_audio,
+                    }
+
+        for key, fmt in best_for_height.items():
+            if key not in seen_resolutions:
+                seen_resolutions[key] = {
+                    "height": fmt["height"],
+                    "label": key,
+                    "total_size": 0,
+                    "avg_size": 0,
+                    "count": 0,
+                    "format_id": fmt["format_id"],
+                    "has_audio": fmt["has_audio"],
+                }
+            seen_resolutions[key]["total_size"] += fmt["filesize"]
+            seen_resolutions[key]["count"] += 1
+            if fmt["format_id"] and (not seen_resolutions[key]["format_id"] or (fmt["has_audio"] and not seen_resolutions[key]["has_audio"])):
+                seen_resolutions[key]["format_id"] = fmt["format_id"]
+                seen_resolutions[key]["has_audio"] = fmt["has_audio"]
+
+    resolutions = sorted(seen_resolutions.values(), key=lambda x: -x["height"])
+    for r in resolutions:
+        if r["count"] > 0:
+            avg = r["total_size"] // r["count"]
+            r["avg_size"] = avg
+            r["total_size"] = avg * len(videos)
+        else:
+            r["avg_size"] = 0
+            r["total_size"] = 0
+
+    return {
+        "title": playlist_title,
+        "videos": videos,
+        "resolutions": resolutions,
+    }
+
+
+def download_playlist_video(
+    url: str,
+    output_dir: str,
+    target_height: int = 0,
+    format_id: str | None = None,
+    retries: int = 3,
+) -> tuple[bool, str]:
+    info = get_video_info(url)
+    title = sanitize_filename(info.get("title", "video"))
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    if format_id:
+        fmt = f"{format_id}+bestaudio/best[height<={target_height}]/best"
+    elif target_height > 0:
+        fmt = f"bestvideo[height<={target_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={target_height}]/best[ext=mp4]/best"
+    else:
+        fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+
+    opts = {
+        **_YTDL_COMMON,
+        "outtmpl": str(output_path / f"{title}.%(ext)s"),
+        "merge_output_format": "mp4",
+        "format": fmt,
+        "no_warnings": True,
+        "no_part": True,
+        "retries": retries,
+        "fragment_retries": retries,
+        "retry_on_fragments_missing": True,
+        "progress_hooks": [lambda d: _print_dl_progress(d, title)],
+    }
+
+    for attempt in range(1, retries + 1):
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            return True, title
+        except Exception as e:
+            if attempt < retries:
+                wait = attempt * 10
+                print(f"    Retry {attempt}/{retries} in {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"    Failed after {retries} attempts: {e}")
+    return False, title
+
+
+def _print_dl_progress(d, title=""):
+    status = d.get("status")
+    if status == "downloading":
+        total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+        downloaded = d.get("downloaded_bytes") or 0
+        speed = d.get("speed")
+        eta = d.get("eta")
+        if total > 0:
+            pct = downloaded / total * 100
+            dl_mb = downloaded / 1048576
+            total_mb = total / 1048576
+            speed_str = f"{speed/1048576:.1f}MB/s" if speed else "?"
+            eta_str = f"{eta//60}m{eta%60:02d}s" if eta else "?"
+            print(f"    {pct:5.1f}%  {dl_mb:.1f}/{total_mb:.1f}MB  {speed_str}  ETA {eta_str}    ", end="\r", flush=True)
+    elif status == "finished":
+        print()
+
+
 def download_video(
     url: str,
     format_id: str | None = None,

@@ -44,6 +44,12 @@ def ensure_model_downloaded() -> bool:
     return True
 
 
+def shutil_rmtree(path: Path):
+    import shutil
+    if path.exists() and path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
+
+
 def separate_vocals(input_path: str, output_dir: str) -> dict | None:
     input_p = Path(input_path)
     output_p = Path(output_dir)
@@ -154,12 +160,6 @@ def separate_vocals_batch(
         results.append(result)
 
     return results
-
-
-def shutil_rmtree(path: Path):
-    import shutil
-    if path.exists() and path.is_dir():
-        shutil.rmtree(path, ignore_errors=True)
 
 
 def create_vocals_video(video_path: str, vocals_mp3: str, output_path: str) -> bool:

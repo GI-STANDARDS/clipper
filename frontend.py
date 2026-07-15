@@ -77,6 +77,7 @@ def menu():
     print()
     print(f"  --- YouTube ---")
     print(f"  [8]  YouTube Direct")
+    print(f"  [13] Playlist Download")
     print()
     print(f"  --- Tools ---")
     print(f"  [10] YouTube Extract (transcript + comments)")
@@ -444,6 +445,113 @@ def youtube_direct():
     input("  Press Enter to continue...")
 
 
+def playlist_download():
+    clear_screen()
+    print("-- Playlist Download --------------------------------")
+    print()
+    print("  Download all videos from a YouTube playlist")
+    print("  at a chosen resolution.")
+    print()
+
+    url = input("  Paste playlist URL: ").strip()
+    if not url:
+        print("  (cancelled)")
+        input("  Press Enter to continue...")
+        return
+    if not is_youtube_url(url):
+        print("  [ERROR] Not a valid YouTube URL.")
+        input("  Press Enter to continue...")
+        return
+
+    print()
+    print("  Select download folder...")
+    root = tk.Tk()
+    root.withdraw()
+    folder = filedialog.askdirectory(title="Select download folder")
+    root.destroy()
+    if not folder:
+        print("  (cancelled)")
+        input("  Press Enter to continue...")
+        return
+
+    print(f"  Folder: {folder}")
+    print()
+    print("  Fetching playlist info (sampling a few videos)...")
+
+    from downloader import fetch_playlist_info, download_playlist_video, format_size
+
+    try:
+        info = fetch_playlist_info(url)
+    except Exception as e:
+        print(f"  [ERROR] Failed to fetch playlist: {e}")
+        input("  Press Enter to continue...")
+        return
+
+    videos = info["videos"]
+    resolutions = info["resolutions"]
+    playlist_title = info["title"]
+
+    print()
+    print(f"  Playlist: {playlist_title}")
+    print(f"  Videos:   {len(videos)}")
+    print()
+
+    if not resolutions:
+        print("  [ERROR] No downloadable formats found.")
+        input("  Press Enter to continue...")
+        return
+
+    print(f"  {'ID':<5} {'Resolution':<12} {'Total Size':<14} {'Avg/Video':<14} {'Available'}")
+    print(f"  {'-'*5} {'-'*12} {'-'*14} {'-'*14} {'-'*10}")
+
+    for i, r in enumerate(resolutions, 1):
+        total = format_size(r["total_size"]) if r["total_size"] > 0 else "?"
+        avg = format_size(r["avg_size"]) if r["avg_size"] > 0 else "?"
+        print(f"  {i:<5} {r['label']:<12} {total:<14} {avg:<14} {r['count']}/{len(videos)}")
+
+    print()
+    while True:
+        fmt_input = input(f"  Select resolution ID (1-{len(resolutions)}): ").strip()
+        if fmt_input.isdigit():
+            idx = int(fmt_input) - 1
+            if 0 <= idx < len(resolutions):
+                chosen = resolutions[idx]
+                break
+        print(f"  [!] Enter a number between 1 and {len(resolutions)}")
+
+    print()
+    print(f"  Selected: {chosen['label']}")
+    print(f"  Downloading {len(videos)} videos to: {folder}")
+    print()
+
+    success_count = 0
+    fail_count = 0
+
+    for i, vid in enumerate(videos, 1):
+        vid_title = vid["title"]
+        vid_url = f"https://www.youtube.com/watch?v={vid['id']}"
+        print(f"  [{i}/{len(videos)}] {vid_title}")
+
+        ok, _ = download_playlist_video(
+            vid_url,
+            folder,
+            target_height=chosen["height"],
+            format_id=chosen["format_id"],
+        )
+
+        if ok:
+            success_count += 1
+            print(f"  [{i}/{len(videos)}] Done")
+        else:
+            fail_count += 1
+            print(f"  [{i}/{len(videos)}] Failed")
+        print()
+
+    print(f"  Finished: {success_count} downloaded, {fail_count} failed")
+    print(f"  Output:   {folder}")
+    input("  Press Enter to continue...")
+
+
 def youtube_extract():
     clear_screen()
     print("-- YouTube Extract ----------------------------------")
@@ -462,7 +570,7 @@ def youtube_extract():
         input("  Press Enter to continue...")
         return
 
-    from extractor import (
+    from yt_extractor import (
         check_extracted,
         extract_transcript,
         extract_comments,
@@ -675,6 +783,8 @@ def main():
             process_one()
         elif choice == "8":
             youtube_direct()
+        elif choice == "13":
+            playlist_download()
         elif choice == "10":
             youtube_extract()
         elif choice == "11":
@@ -689,7 +799,7 @@ def main():
             pass
         else:
             clear_screen()
-            print("  Invalid option. Enter a number 1-12.")
+            print("  Invalid option. Enter a number 1-13.")
             input("  Press Enter to continue...")
 
 

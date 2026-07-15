@@ -2,8 +2,6 @@ import re
 import subprocess
 from pathlib import Path
 
-from moviepy import VideoFileClip
-from proglog import TqdmProgressBarLogger
 from tqdm import tqdm
 
 
@@ -86,50 +84,4 @@ def clip_with_ffmpeg(
         pbar.update(1)
 
     pbar.close()
-    return clips
-
-
-def clip_timestamps(
-    video_path: str,
-    timestamps: list[tuple[float, float, str]],
-    output_dir: str,
-) -> list[str]:
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    video = VideoFileClip(str(video_path))
-    duration = video.duration
-
-    clips = []
-    pbar = tqdm(total=len(timestamps), desc="Clipping", unit="clip", position=0)
-
-    for i, (start, end, label) in enumerate(timestamps, 1):
-        if start >= duration:
-            print(f"  [SKIP] Clip {i} start {start}s exceeds video duration {duration:.0f}s")
-            continue
-        if end > duration:
-            print(f"  [WARN] Clip {i} end {end}s exceeds video duration, trimming to {duration:.0f}s")
-            end = duration
-
-        subclip = video.subclipped(start, end)
-        out_path = str(output_dir / f"clip_{i:02d}_{label}.mp4")
-        temp_audio = str(output_dir / f"_temp_audio_{i}.m4a")
-
-        subclip.write_videofile(
-            out_path,
-            codec="libx264",
-            audio_codec="aac",
-            temp_audiofile=temp_audio,
-            logger=TqdmProgressBarLogger(
-                bars={"frame_index": {"title": f"  Encoding {i}/{len(timestamps)}", "index": -1, "total": None, "message": ""}},
-                leave_bars=False,
-                print_messages=False,
-            ),
-            fps=min(30, int(getattr(video, "fps", 30) or 30)),
-        )
-        clips.append(out_path)
-        pbar.update(1)
-
-    pbar.close()
-    video.close()
     return clips

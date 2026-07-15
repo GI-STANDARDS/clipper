@@ -89,15 +89,34 @@ def translate_segments(segments, source_lang):
 
 
 def find_font():
+    import platform
+    system = platform.system()
     candidates = [
-        "C:/Windows/Fonts/arialbd.ttf",
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/calibrib.ttf",
-        "C:/Windows/Fonts/segoeui.ttf",
-        "C:/Windows/Fonts/times.ttf",
         "Arial-Bold",
         "Arial-BoldMT",
     ]
+    if system == "Windows":
+        candidates = [
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/calibrib.ttf",
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/times.ttf",
+        ] + candidates
+    elif system == "Darwin":
+        candidates = [
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/Library/Fonts/Arial Bold.ttf",
+            os.path.expanduser("~/Library/Fonts/Arial Bold.ttf"),
+        ] + candidates
+    else:
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+            "/usr/local/share/fonts/DejaVuSans-Bold.ttf",
+        ] + candidates
     for font in candidates:
         if os.path.isfile(font):
             return font
